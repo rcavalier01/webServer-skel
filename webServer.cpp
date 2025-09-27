@@ -137,7 +137,7 @@ int main (int argc, char *argv[]) {
   // ********************************************************************
   int listenFd;
   DEBUG << "Calling Socket() assigned file descriptor " << listenFd << ENDL;
-
+  listenFd = socket(AF_INET, SOCK_STREAM, 0);
   
   // ********************************************************************
   // * The bind() call takes a structure used to spefiy the details of the connection. 
@@ -150,8 +150,11 @@ int main (int argc, char *argv[]) {
   // address INADDR_ANY
   // ********************************************************************
 
-
-
+  struct sockaddr_in server_addr;
+  server_addr.sin_addr.s_addr = INADDR_ANY; //inet_aDDR() or hton
+  server_addr.sin_family = AF_INET;
+  
+  
   // ********************************************************************
   // * Binding configures the socket with the parameters we have
   // * specified in the servaddr structure.  This step is implicit in
@@ -161,8 +164,13 @@ int main (int argc, char *argv[]) {
   // * you picked is in use, and if the port is in use, pick a different one.
   // ********************************************************************
   uint16_t port;
+  bool exitLoop;
+  exitLoop = false;
   DEBUG << "Calling bind()" << ENDL;
-  
+  while(exitLoop == false){
+    
+  }
+
   std::cout << "Using port: " << port << std::endl;
 
 
