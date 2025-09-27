@@ -23,7 +23,7 @@
 // * - Program is terminated with SIGINT (ctrl-C)
 // **************************************************************************************
 #include "webServer.h"
-
+#include <signal.h>
 
 // **************************************************************************************
 // * Signal Handler.
@@ -31,7 +31,12 @@
 // * - Optional for 471, required for 598
 // **************************************************************************************
 // void sig_handler(int signo) {}
-
+void sig_handler(int signo) {
+  DEBUG << "Caught signal #" << signo << ENDL;
+  DEBUG << "CLosing file descriptors 3-31." << ENDL;
+  closefrom(3);
+  exit(1);
+}
 
 // **************************************************************************************
 // * processRequest,
@@ -124,7 +129,7 @@ int main (int argc, char *argv[]) {
   // * Catch all possible signals
   // ********************************************************************
   DEBUG << "Setting up signal handlers" << ENDL;
-  
+  signal(SIGINT, sig_handler);
 
   
   // *******************************************************************
