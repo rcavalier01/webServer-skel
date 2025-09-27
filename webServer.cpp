@@ -137,7 +137,8 @@ int main (int argc, char *argv[]) {
   // ********************************************************************
   int listenFd;
   DEBUG << "Calling Socket() assigned file descriptor " << listenFd << ENDL;
-  listenFd = socket(AF_INET, SOCK_STREAM, 0);
+  listenFd = socket(PF_INET, SOCK_STREAM, 0);
+  //check fir errir
   
   // ********************************************************************
   // * The bind() call takes a structure used to spefiy the details of the connection. 
@@ -151,8 +152,8 @@ int main (int argc, char *argv[]) {
   // ********************************************************************
 
   struct sockaddr_in server_addr;
-  server_addr.sin_addr.s_addr = INADDR_ANY; //inet_aDDR() or hton
-  server_addr.sin_family = AF_INET;
+  server_addr.sin_addr.s_addr = INADDR_ANY; //or htonl
+  server_addr.sin_family = PF_INET;
   
   
   // ********************************************************************
@@ -166,9 +167,20 @@ int main (int argc, char *argv[]) {
   uint16_t port;
   bool exitLoop;
   exitLoop = false;
+  port = 1701;
   DEBUG << "Calling bind()" << ENDL;
   while(exitLoop == false){
-    
+    server_addr.sin_port = htons(port);  //hon()??
+    int try_bind = bind(listenFd, (struct sockaddr *)&server_addr, sizeof(server_addr));
+    if(try_bind == -1){
+      //IFF ADRESS IN USE
+      port = port+1;
+      continue;
+      //if error exit and debug
+    }
+    else if(try_bind != -1){
+      exitLoop = true;
+    }
   }
 
   std::cout << "Using port: " << port << std::endl;
@@ -180,6 +192,8 @@ int main (int argc, char *argv[]) {
   // * connections and starts the kernel listening for connections.
   // ********************************************************************
   DEBUG << "Calling listen()" << ENDL;
+  listen(listenFd, 10);
+  //check failure
 
 
   // ********************************************************************
@@ -191,8 +205,10 @@ int main (int argc, char *argv[]) {
   while (!quitProgram) {
     int connFd = 0;
     DEBUG << "Calling connFd = accept(fd,NULL,NULL)." << ENDL;
-
-    
+    connFd = accept(listenFd, NULL, NULL);
+    if(connFd == -1){
+      DEBUG << "Accept failure" << ENDL;
+    }
 
     DEBUG << "We have recieved a connection on " << connFd << ". Calling processConnection(" << connFd << ")" << ENDL;
     quitProgram = processConnection(connFd);
