@@ -46,10 +46,10 @@ void sig_handler(int signo) {
 int readHeader(int sockFd,std::string &filename) {
   int code = 400;
   std::string container;
-  char buffer[128];
+  char buffer[10];
   bool endHeader = false;
   while(!endHeader){
-    ssize_t byteRead = read(sockFd, buffer, 128);
+    ssize_t byteRead = read(sockFd, buffer, 10);
     container.append(buffer, byteRead);
     if(container.find("\r\n\r\n") != std::string::npos){
       endHeader = true;
@@ -103,7 +103,7 @@ int readHeader(int sockFd,std::string &filename) {
     //something else wrong
     code = 404;
   }
-  return 0;
+  return code;
 }
 
 
@@ -112,6 +112,14 @@ int readHeader(int sockFd,std::string &filename) {
 // * - Assumes the terminator is not included, so it is appended.
 // **************************************************************************
 void sendLine(int socketFd, std::string &stringToSend) {
+  size_t stringLength = stringToSend.length();
+  char line[stringLength+2];
+  stringToSend.copy(line, stringLength);
+  size_t end_position = sizeof(line) - 1;
+  //add cr lf
+  line[end_position] = '\n';
+  line[end_position - 1] = '\r';
+  write(socketFd, line, sizeof(line));
   return;
 }
 
