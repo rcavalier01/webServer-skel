@@ -85,13 +85,22 @@ void sesendFile(int sockFd,std::string filename) {
 // * -- process one connection/request.
 // **************************************************************************************
 int processConnection(int sockFd) {
-  std::string curr_line;
+  std::string container;
   char buffer[10];
   bool closeFound = false;
   bool terminatorFound = false;
   while(!closeFound){
-    while(!terminatorFound){
 
+    while(!terminatorFound){
+        ssize_t readBytes = read(sockFd,buffer,10);
+        container.append(buffer, readBytes);
+        if(container.find("\r\n") != std::string::npos){
+          terminatorFound = true;
+        }
+    }
+    write(sockFd, container.data(), container.size());
+    if(container.find("CLOSE") != std::string::npos){
+      closeFound = true;
     }
   }
   // Call readHeader()
@@ -146,6 +155,9 @@ int main (int argc, char *argv[]) {
   int listenFd;
   DEBUG << "Calling Socket() assigned file descriptor " << listenFd << ENDL;
   listenFd = socket(PF_INET, SOCK_STREAM, 0);
+  if(listenFd == -1){
+    DEBUG << "problem with listen()" << ENDL;
+  }
   //check fir errir
   
   // ********************************************************************
@@ -183,6 +195,7 @@ int main (int argc, char *argv[]) {
     if(try_bind == -1){
       if(errno == EADDRINUSE){
         //IFF ADRESS IN USE
+        DEBUG << "Port in Use, Trying Next" << ENDL;
         port = port+1;
         continue;
       }else{
