@@ -44,6 +44,65 @@ void sig_handler(int signo) {
 //   - Set filename if appropriate. Filename syntax is valided but existance is not verified.
 // **************************************************************************************
 int readHeader(int sockFd,std::string &filename) {
+  int code = 400;
+  std::string container;
+  char buffer[1024];
+  bool endHeader = false;
+  while(!endHeader){
+    ssize_t byteRead = read(sockFd, buffer, 1024);
+    container.append(buffer, byteRead);
+    if(container.find("\r\n\r\n") != std::string::npos){
+      endHeader = true;
+    }
+  }
+  //first line look for GET
+  size_t lineEnd = container.find("\r\n");
+  //400?
+  std::string getLine = container.substr(0,lineEnd);
+  //if valid get get filename
+  size_t endGet = getLine.find(' ');
+  std::string get = getLine.substr(0, endGet);
+  size_t endAddr = getLine.find(' ', endGet +1);
+  std::string addr = getLine.substr(endGet+1, endAddr - endGet -1);
+  if(get != "GET"){
+    DEBUG << "NOT a valid GET" << ENDL;
+    return code;
+  }
+  filename = addr.substr(1);
+  //check filename validity
+  //imageX.jpg or fileX.html both 10 char
+  if(filename.length() != 10){
+    DEBUG << "Invalid filename length" << ENDL;
+    code = 404;
+  }
+  if(filename.substr(0,5) == "image"){
+    if((filename[5] >= '0') && (filename[5] <= '9')){
+      if(filename.substr(6) == ".jpg"){
+        code = 200;
+      }else{
+        DEBUG << "Wrong image type" << ENDL;
+        code = 404;
+      }
+    }else{
+      DEBUG << "Incorrect digit extension" << ENDL;
+      code = 404;
+    }
+  }else if(filename.substr(0,4) == "file"){
+    if((filename[4] >= '0') && (filename[4] <= '9')){
+      if(filename.substr(5) == ".html"){
+        code = 200;
+      }else{
+        DEBUG << "Wrong file type" << ENDL;
+        code = 404;
+      }
+    }else{
+      DEBUG << "Incorrect digit extension" << ENDL;
+      code = 404;
+    }
+  }else{
+    //something else wrong
+    code = 404;
+  }
   return 0;
 }
 
@@ -104,6 +163,17 @@ int processConnection(int sockFd) {
     }
   }
   // Call readHeader()
+  //int headerReturn = readHeader(sockFd);
+  //if(headerReturn == 400){
+  //  send400();
+  //  return 0;
+  //}else if(headerReturn == 404){
+  //  send404();
+  //  return 0;
+  //}else if(headerReturn == 200){
+  //  send200();
+  //}
+
 
   // If read header returned 400, send 400
 
