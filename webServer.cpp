@@ -46,10 +46,10 @@ void sig_handler(int signo) {
 int readHeader(int sockFd,std::string &filename) {
   int code = 400;
   std::string container;
-  char buffer[1024];
+  char buffer[128];
   bool endHeader = false;
   while(!endHeader){
-    ssize_t byteRead = read(sockFd, buffer, 1024);
+    ssize_t byteRead = read(sockFd, buffer, 128);
     container.append(buffer, byteRead);
     if(container.find("\r\n\r\n") != std::string::npos){
       endHeader = true;
