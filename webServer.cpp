@@ -85,7 +85,15 @@ void sesendFile(int sockFd,std::string filename) {
 // * -- process one connection/request.
 // **************************************************************************************
 int processConnection(int sockFd) {
- 
+  std::string curr_line;
+  char buffer[10];
+  bool closeFound = false;
+  bool terminatorFound = false;
+  while(!closeFound){
+    while(!terminatorFound){
+
+    }
+  }
   // Call readHeader()
 
   // If read header returned 400, send 400
@@ -167,18 +175,22 @@ int main (int argc, char *argv[]) {
   uint16_t port;
   bool exitLoop;
   exitLoop = false;
-  port = 1701;
+  port = 1029;
   DEBUG << "Calling bind()" << ENDL;
   while(exitLoop == false){
     server_addr.sin_port = htons(port);  //hon()??
     int try_bind = bind(listenFd, (struct sockaddr *)&server_addr, sizeof(server_addr));
     if(try_bind == -1){
-      //IFF ADRESS IN USE
-      port = port+1;
-      continue;
-      //if error exit and debug
-    }
-    else if(try_bind != -1){
+      if(errno == EADDRINUSE){
+        //IFF ADRESS IN USE
+        port = port+1;
+        continue;
+      }else{
+        //if error exit and debug
+        DEBUG << "Bind Failure" << ENDL;
+        exit(1);
+      }
+    }else if(try_bind != -1){
       exitLoop = true;
     }
   }
