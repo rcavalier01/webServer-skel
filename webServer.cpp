@@ -127,6 +127,15 @@ void sendLine(int socketFd, std::string &stringToSend) {
 // * Send the entire 404 response, header and body.
 // **************************************************************************
 void send404(int sockFd) {
+  std::string string404 = "HTTP/1.0 404 Not Found";
+  std::string content = "Content-type: text/html";
+  std::string blankLine = "";
+  std::string helpful = "The requested document does not exist on this server."; 
+  sendLine(sockFd, string404);
+  sendLine(sockFd, content);
+  sendLine(sockFd, blankLine);
+  sendLine(sockFd, helpful);
+  sendLine(sockFd, blankLine);
   return;
 }
 
@@ -156,6 +165,7 @@ int processConnection(int sockFd) {
   char buffer[10];
   bool closeFound = false;
   bool terminatorFound = false;
+  std::string filename;
   while(!closeFound){
 
     while(!terminatorFound){
@@ -171,16 +181,16 @@ int processConnection(int sockFd) {
     }
   }
   // Call readHeader()
-  //int headerReturn = readHeader(sockFd);
-  //if(headerReturn == 400){
-  //  send400();
-  //  return 0;
-  //}else if(headerReturn == 404){
-  //  send404();
-  //  return 0;
-  //}else if(headerReturn == 200){
-  //  send200();
-  //}
+  int headerReturn = readHeader(sockFd, filename);
+  if(headerReturn == 400){
+    send400(sockFd);
+    return 0;
+  }else if(headerReturn == 404){
+    send404(sockFd);
+    return 0;
+  }else if(headerReturn == 200){
+    sesendFile(sockFd, filename);
+  }
 
 
   // If read header returned 400, send 400
