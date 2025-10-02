@@ -143,6 +143,9 @@ void send404(int sockFd) {
 // * Send the entire 400 response, header and body.
 // **************************************************************************
 void send400(int sockFd) {
+  std::string string400 = "HTTP/1.0 400 Bad Request";
+  std::string blankLine = "";
+  sendLine(sockFd, blankLine);
   return;
 }
 
@@ -152,6 +155,8 @@ void send400(int sockFd) {
 // * -- Send a file back to the browser.
 // **************************************************************************************
 void sesendFile(int sockFd,std::string filename) {
+  //int sizeFile = stat(filename);
+
   return;
 }
 
