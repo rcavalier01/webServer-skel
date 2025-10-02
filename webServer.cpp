@@ -155,8 +155,55 @@ void send400(int sockFd) {
 // * -- Send a file back to the browser.
 // **************************************************************************************
 void sesendFile(int sockFd,std::string filename) {
-  //int sizeFile = stat(filename);
+  std::string string200 = "HTTP/1.0 200 OK";
+  std::string blankLine = "";
+  std::string contentImage = "Content-Type: image/jpeg";
+  std::string contentFile = "Content-Type: text/html";
+  std::string contentLength = "Content-Length: ";
+  struct stat filenameStat;
+  if(stat(filename.c_str(), &filenameStat) == -1){
+    //read permission lacking or DNE
+    send404(sockFd);
+    return;
+  }
+  int sizeFile = filenameStat.st_size;
+  sendLine(sockFd, string200);
+  if(filename.find("image") != std::string::npos){
+    sendLine(sockFd, contentImage);
+  }else if(filename.find("file") != std::string::npos){
+    sendLine(sockFd, contentFile);
+  }
+  contentLength.append(std::to_string(sizeFile));
+  sendLine(sockFd, contentLength);
+  //send file with these
+  //open file
+  int fileRead = open(filename.c_str(), O_RDONLY);
+  if(fileRead == -1){
+    send404(sockFd);
+    return;
+  }
+  //allocate 10 bytes of mem with malloc() or new[]
+  char *memBuffer = new char[10];
+  size_t byteSent = 0;
+  //while # of bytes sent != size of file
+  while(byteSent != sizeFile){
+    //clear out the memory with bzero or something
+    bzero(memBuffer, 10);
+    //read() up to 10 bytes from the file into your memory buffer
+    ssize_t byteRead = read(fileRead, memBuffer, 10);
+    if(byteRead <= 0){
+      break;
+    }
+    //write() the number of bytes you read
+    ssize_t currBytes = write(sockFd, memBuffer, byteRead);
+    byteSent +=  currBytes;
+  }
+  
 
+  //when done just return
+  //since you set the content length you dont send the line terminator at the end of the file
+  close(fileRead);
+  delete[] memBuffer;
   return;
 }
 
