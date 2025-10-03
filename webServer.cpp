@@ -71,41 +71,12 @@ int readHeader(int sockFd,std::string &filename) {
     DEBUG << "NOT a valid GET" << ENDL;
     return code;
   }
-  filename = addr.substr(1);
+  //post and head
+  filename = "/data/" + addr.substr(1);
+  std::cout << "filename is " << filename << std::endl;
   //check filename validity
-  //imageX.jpg or fileX.html both 10 char
-  if(filename.length() != 10){
-    DEBUG << "Invalid filename length" << ENDL;
-    code = 404;
-  }
-  if(filename.substr(0,5) == "image"){
-    if((filename[5] >= '0') && (filename[5] <= '9')){
-      if(filename.substr(6) == ".jpg"){
-        code = 200;
-      }else{
-        DEBUG << "Wrong image type" << ENDL;
-        code = 404;
-      }
-    }else{
-      DEBUG << "Incorrect digit extension" << ENDL;
-      code = 404;
-    }
-  }else if(filename.substr(0,4) == "file"){
-    if((filename[4] >= '0') && (filename[4] <= '9')){
-      if(filename.substr(5) == ".html"){
-        code = 200;
-      }else{
-        DEBUG << "Wrong file type" << ENDL;
-        code = 404;
-      }
-    }else{
-      DEBUG << "Incorrect digit extension" << ENDL;
-      code = 404;
-    }
-  }else{
-    //something else wrong
-    code = 404;
-  }
+  //how to check a filename has number .html or number and .jpg and file/image
+  //std::regex filenameExpression("")
   return code;
 }
 
@@ -291,7 +262,8 @@ int main (int argc, char *argv[]) {
   // ********************************************************************
   DEBUG << "Setting up signal handlers" << ENDL;
   signal(SIGINT, sig_handler);
-
+//for loop i 32
+  //signal(i, sig_handler);
   
   // *******************************************************************
   // * Creating the inital socket using the socket() call.
