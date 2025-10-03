@@ -175,6 +175,7 @@ void sesendFile(int sockFd,std::string filename) {
   }
   contentLength.append(std::to_string(sizeFile));
   sendLine(sockFd, contentLength);
+  sendLine(sockFd, blankLine);
   //send file with these
   //open file
   int fileRead = open(filename.c_str(), O_RDONLY);
