@@ -48,6 +48,8 @@ int readHeader(int sockFd,std::string &filename) {
   std::string container;
   char buffer[10];
   bool endHeader = false;
+  std::cout << "file name is" << filename << std::endl;
+  
   while(!endHeader){
     ssize_t byteRead = read(sockFd, buffer, 10);
     container.append(buffer, byteRead);
@@ -59,6 +61,7 @@ int readHeader(int sockFd,std::string &filename) {
   size_t lineEnd = container.find("\r\n");
   //400?
   std::string getLine = container.substr(0,lineEnd);
+  std::cout << "getline is" << getLine << std::endl;
   //if valid get get filename
   size_t endGet = getLine.find(' ');
   std::string get = getLine.substr(0, endGet);
@@ -115,11 +118,10 @@ void sendLine(int socketFd, std::string &stringToSend) {
   size_t stringLength = stringToSend.length();
   char line[stringLength+2];
   stringToSend.copy(line, stringLength);
-  size_t end_position = sizeof(line) - 1;
   //add cr lf
-  line[end_position] = '\n';
-  line[end_position - 1] = '\r';
-  write(socketFd, line, sizeof(line));
+  line[stringLength+1] = '\n';
+  line[stringLength] = '\r';
+  write(socketFd, line, (stringLength + 2));
   return;
 }
 
@@ -145,6 +147,7 @@ void send404(int sockFd) {
 void send400(int sockFd) {
   std::string string400 = "HTTP/1.0 400 Bad Request";
   std::string blankLine = "";
+  sendLine(sockFd, string400);
   sendLine(sockFd, blankLine);
   return;
 }
@@ -219,32 +222,32 @@ int processConnection(int sockFd) {
   bool closeFound = false;
   bool terminatorFound = false;
   std::string filename;
-  while(!closeFound){
+  // while(!closeFound){
 
-    while(!terminatorFound){
-        ssize_t readBytes = read(sockFd,buffer,10);
-        container.append(buffer, readBytes);
-        if(container.find("\r\n") != std::string::npos){
-          terminatorFound = true;
-        }
-    }
-    write(sockFd, container.data(), container.size());
-    if(container.find("CLOSE") != std::string::npos){
-      closeFound = true;
-    }
-  }
-  // Call readHeader()
+  //   while(!terminatorFound){
+  //       ssize_t readBytes = read(sockFd,buffer,10);
+  //       container.append(buffer, readBytes);
+  //       if(container.find("\r\n") != std::string::npos){
+  //         terminatorFound = true;
+  //       }
+  //   }
+  //   //write(sockFd, container.data(), container.size());
+  //   if(container.find("CLOSE") != std::string::npos){
+  //     closeFound = true;
+  //   }
+  // }
+  //Call readHeader()
   int headerReturn = readHeader(sockFd, filename);
   if(headerReturn == 400){
-    send400(sockFd);
-    return 0;
+   send400(sockFd);
+   return 0;
   }else if(headerReturn == 404){
-    send404(sockFd);
-    return 0;
+   send404(sockFd);
+   return 0;
   }else if(headerReturn == 200){
-    sesendFile(sockFd, filename);
+   sesendFile(sockFd, filename);
   }
-
+  
 
   // If read header returned 400, send 400
 
