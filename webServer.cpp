@@ -45,7 +45,7 @@ void sig_handler(int signo) {
 //   - Return HTTP code to be sent back
 //   - Set filename if appropriate. Filename syntax is valided but existance is not verified.
 // **************************************************************************************
-int readHeader(int sockFd,std::string &filename, std::string &request, int &contentLength) {
+int readHeader(int sockFd,std::string &filename, std::string &request, int &contentLength, std::string &bodyStart) {
   int code = 400;
   std::string container;
   char buffer[10];
@@ -53,19 +53,16 @@ int readHeader(int sockFd,std::string &filename, std::string &request, int &cont
   while(!endHeader){
     ssize_t byteRead = read(sockFd, buffer, 10);
     container.append(buffer, byteRead);
-    if(container.find("\r\n\r\n") != std::string::npos){
+    size_t endHeaderPos = container.find("\r\n\r\n");
+    if(endHeaderPos != std::string::npos){
       endHeader = true;
+      if(container.size() > endHeaderPos + 4){
+        bodyStart = container.substr(endHeaderPos + 4);
+      }
+
     }
   }
-  /*
-  * For post
-  */
-  size_t contentStart = container.find("Content-Length:");
-  if(contentStart != std::string::npos){
-    size_t contentEnd = container.find("\r\n", contentStart);
-    std::string lenSeg = container.substr(contentStart + 15, contentEnd - contentStart- 15);
-    contentLength = std::stoi(lenSeg);
-  }
+  
   //first line look for GET (and later post)
   size_t lineEnd = container.find("\r\n");
   //400?
@@ -82,10 +79,19 @@ int readHeader(int sockFd,std::string &filename, std::string &request, int &cont
     std::cout << "NOT a valid Request" << std::endl;
     return code;
   }
+  //get content length so post body read doesnt hang terminal
+  if(request == "POST"){
+    size_t contentStart = container.find("Content-Length:");
+    if(contentStart != std::string::npos){
+      size_t contentEnd = container.find("\r\n", contentStart);
+      std::string lenSeg = container.substr(contentStart + 15, contentEnd - contentStart- 15);
+      contentLength = std::stoi(lenSeg);
+    }
+  }
   filename = "data/" + addr.substr(1);
   DEBUG << "filename is " << filename << ENDL;
   //check filename validity
-  //how to check a filename has number .html or number and .jpg and file/image
+  //regular expression
   std::regex filenameExpression("(image[0-4]\\.jpg|file[0-9]\\.html)");
   bool accepted = std::regex_search(filename, filenameExpression);
   if(accepted){
@@ -173,7 +179,7 @@ void sendHead(int sockFd, std::string filename){
 // **************************************************************************
 // * Save the file through overwite or creation
 // **************************************************************************
-void saveFile(int sockFd, std::string filename, int contentLength){
+void saveFile(int sockFd, std::string filename, int contentLength, std::string bodyStart){
   //OTRUNC is overwrite and OCREAT is create if DNE
   DEBUG << "In saveFile" << ENDL;
   DEBUG << "contentLength is '" << contentLength << "'" << ENDL;
@@ -195,16 +201,13 @@ void saveFile(int sockFd, std::string filename, int contentLength){
     send400(sockFd);
     return;
   }
-  // while(!endBody){
-  //   bytesRead = read(sockFd, buffer, 10);
-  //   if(bytesRead <= 0){
-  //     //EOF
-  //     endBody = true;
-  //     DEBUG << "END of body detected" << ENDL;
-  //     continue;
-  //   }
-  //   write(post, buffer, bytesRead);
-  // }
+  /*
+  my read was eating the first 2 characters so save them then resume with writing body
+  */
+  if(!bodyStart.empty()){
+    write(post, bodyStart.data(), bodyStart.size());
+    total += bodyStart.size();
+  }
   while(total != contentLength){
     ssize_t readSize = 10;
     //expected til end
@@ -283,9 +286,7 @@ void sesendFile(int sockFd,std::string filename) {
     ssize_t currBytes = write(sockFd, memBuffer, byteRead);
     byteSent +=  currBytes;
   }
-  
-  //when done just return
-  //since you set the content length you dont send the line terminator at the end of the file
+
   close(fileRead);
   delete[] memBuffer;
   return;
@@ -304,10 +305,11 @@ int processConnection(int sockFd) {
   std::string filename;
   std::string request;
   int contentLength = 0;
+  std::string bodyStart;
   //Call readHeader()
-  int headerReturn = readHeader(sockFd, filename, request, contentLength);
-  // If read header returned 400, send 400
+  int headerReturn = readHeader(sockFd, filename, request, contentLength, bodyStart);
   if(headerReturn == 400){
+  // If read header returned 400, send 400
    send400(sockFd);
    return 0;
   }else if(headerReturn == 404){
@@ -323,7 +325,7 @@ int processConnection(int sockFd) {
     sendHead(sockFd, filename);
   }else if(headerReturn == 200 && request == "POST"){
     // - If the header was valid and the method was POST, call a function to save the file to dis.
-    saveFile(sockFd, filename, contentLength);
+    saveFile(sockFd, filename, contentLength, bodyStart);
   }
 
   return 0;
@@ -433,6 +435,7 @@ int main (int argc, char *argv[]) {
   DEBUG << "Calling listen()" << ENDL;
   listen(listenFd, 10);
   //check failure
+  
 
 
   // ********************************************************************
