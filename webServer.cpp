@@ -48,8 +48,6 @@ int readHeader(int sockFd,std::string &filename) {
   std::string container;
   char buffer[10];
   bool endHeader = false;
-  std::cout << "file name is" << filename << std::endl;
-  
   while(!endHeader){
     ssize_t byteRead = read(sockFd, buffer, 10);
     container.append(buffer, byteRead);
@@ -57,26 +55,35 @@ int readHeader(int sockFd,std::string &filename) {
       endHeader = true;
     }
   }
-  //first line look for GET
+  //first line look for GET (and later post)
   size_t lineEnd = container.find("\r\n");
   //400?
   std::string getLine = container.substr(0,lineEnd);
-  std::cout << "getline is" << getLine << std::endl;
-  //if valid get get filename
+  std::cout << "getline is " << getLine << std::endl;
   size_t endGet = getLine.find(' ');
   std::string get = getLine.substr(0, endGet);
   size_t endAddr = getLine.find(' ', endGet +1);
   std::string addr = getLine.substr(endGet+1, endAddr - endGet -1);
+  //if valid get get filename
   if(get != "GET"){
     DEBUG << "NOT a valid GET" << ENDL;
     return code;
   }
   //post and head
-  filename = "/data/" + addr.substr(1);
+  filename = "data/" + addr.substr(1);
   std::cout << "filename is " << filename << std::endl;
   //check filename validity
   //how to check a filename has number .html or number and .jpg and file/image
-  //std::regex filenameExpression("")
+  std::regex filenameExpression("(image[0-4]\\.jpg|file[0-9]\\.html)");
+  bool accepted = std::regex_search(filename, filenameExpression);
+  if(accepted){
+    code = 200;
+    DEBUG << "Accepted" << ENDL;
+  }else if(!accepted){
+    code = 404;
+    DEBUG << "NOT Accepted" << ENDL;
+  }
+  
   return code;
 }
 
@@ -129,6 +136,7 @@ void send400(int sockFd) {
 // * -- Send a file back to the browser.
 // **************************************************************************************
 void sesendFile(int sockFd,std::string filename) {
+  DEBUG << "in send file" << ENDL;
   std::string string200 = "HTTP/1.0 200 OK";
   std::string blankLine = "";
   std::string contentImage = "Content-Type: image/jpeg";
@@ -137,6 +145,7 @@ void sesendFile(int sockFd,std::string filename) {
   struct stat filenameStat;
   if(stat(filename.c_str(), &filenameStat) == -1){
     //read permission lacking or DNE
+    DEBUG << "Stat return -1" << ENDL;
     send404(sockFd);
     return;
   }
@@ -154,6 +163,7 @@ void sesendFile(int sockFd,std::string filename) {
   //open file
   int fileRead = open(filename.c_str(), O_RDONLY);
   if(fileRead == -1){
+    DEBUG << "File open failure" << ENDL;
     send404(sockFd);
     return;
   }
@@ -193,20 +203,6 @@ int processConnection(int sockFd) {
   bool closeFound = false;
   bool terminatorFound = false;
   std::string filename;
-  // while(!closeFound){
-
-  //   while(!terminatorFound){
-  //       ssize_t readBytes = read(sockFd,buffer,10);
-  //       container.append(buffer, readBytes);
-  //       if(container.find("\r\n") != std::string::npos){
-  //         terminatorFound = true;
-  //       }
-  //   }
-  //   //write(sockFd, container.data(), container.size());
-  //   if(container.find("CLOSE") != std::string::npos){
-  //     closeFound = true;
-  //   }
-  // }
   //Call readHeader()
   int headerReturn = readHeader(sockFd, filename);
   if(headerReturn == 400){
@@ -261,8 +257,11 @@ int main (int argc, char *argv[]) {
   // * Catch all possible signals
   // ********************************************************************
   DEBUG << "Setting up signal handlers" << ENDL;
-  signal(SIGINT, sig_handler);
-//for loop i 32
+  //signal(SIGINT, sig_handler);
+  //for loop i 32
+  for(int i = 0; i < 32; i++){
+    signal(i, sig_handler);
+  }
   //signal(i, sig_handler);
   
   // *******************************************************************
