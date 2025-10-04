@@ -45,7 +45,7 @@ void sig_handler(int signo) {
 //   - Return HTTP code to be sent back
 //   - Set filename if appropriate. Filename syntax is valided but existance is not verified.
 // **************************************************************************************
-int readHeader(int sockFd,std::string &filename, std::string &request) {
+int readHeader(int sockFd,std::string &filename, std::string &request, int &contentLength) {
   int code = 400;
   std::string container;
   char buffer[10];
@@ -56,6 +56,15 @@ int readHeader(int sockFd,std::string &filename, std::string &request) {
     if(container.find("\r\n\r\n") != std::string::npos){
       endHeader = true;
     }
+  }
+  /*
+  * For post
+  */
+  size_t contentStart = container.find("Content-Length:");
+  if(contentStart != std::string::npos){
+    size_t contentEnd = container.find("\r\n", contentStart);
+    std::string lenSeg = container.substr(contentStart + 15, contentEnd - contentStart- 15);
+    contentLength = std::stoi(lenSeg);
   }
   //first line look for GET (and later post)
   size_t lineEnd = container.find("\r\n");
@@ -164,9 +173,10 @@ void sendHead(int sockFd, std::string filename){
 // **************************************************************************
 // * Save the file through overwite or creation
 // **************************************************************************
-void saveFile(int sockFd, std::string filename){
+void saveFile(int sockFd, std::string filename, int contentLength){
   //OTRUNC is overwrite and OCREAT is create if DNE
   DEBUG << "In saveFile" << ENDL;
+  DEBUG << "contentLength is '" << contentLength << "'" << ENDL;
   struct stat filenameStat;
   std::string created = "HTTP/1.0 201 Created";
   std::string overwrite = "HTTP/1.0 200 OK";
@@ -174,6 +184,7 @@ void saveFile(int sockFd, std::string filename){
   bool exists = false;
   char buffer[10];
   ssize_t bytesRead;
+  int total = 0;
   bool endBody = false;
   if(stat(filename.c_str(), &filenameStat) == 0){
     exists = true;
@@ -184,15 +195,29 @@ void saveFile(int sockFd, std::string filename){
     send400(sockFd);
     return;
   }
-  while(!endBody){
-    bytesRead = read(sockFd, buffer, 10);
-    if(bytesRead <= 0){
-      //EOF
-      endBody = true;
-      DEBUG << "END of body detected" << ENDL;
-      continue;
+  // while(!endBody){
+  //   bytesRead = read(sockFd, buffer, 10);
+  //   if(bytesRead <= 0){
+  //     //EOF
+  //     endBody = true;
+  //     DEBUG << "END of body detected" << ENDL;
+  //     continue;
+  //   }
+  //   write(post, buffer, bytesRead);
+  // }
+  while(total != contentLength){
+    ssize_t readSize = 10;
+    //expected til end
+    if(contentLength-total < 10){
+      readSize = contentLength - total;
     }
+    bytesRead = read(sockFd, buffer, readSize);
+    if(bytesRead <= 0){
+      //eof or problem
+      break;
+    }  
     write(post, buffer, bytesRead);
+    total += bytesRead;
   }
   DEBUG << "About to send overwrite or create" << ENDL;
   if(exists){
@@ -278,8 +303,9 @@ int processConnection(int sockFd) {
   bool terminatorFound = false;
   std::string filename;
   std::string request;
+  int contentLength = 0;
   //Call readHeader()
-  int headerReturn = readHeader(sockFd, filename, request);
+  int headerReturn = readHeader(sockFd, filename, request, contentLength);
   // If read header returned 400, send 400
   if(headerReturn == 400){
    send400(sockFd);
@@ -297,7 +323,7 @@ int processConnection(int sockFd) {
     sendHead(sockFd, filename);
   }else if(headerReturn == 200 && request == "POST"){
     // - If the header was valid and the method was POST, call a function to save the file to dis.
-    saveFile(sockFd, filename);
+    saveFile(sockFd, filename, contentLength);
   }
 
   return 0;
