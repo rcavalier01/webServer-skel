@@ -22,6 +22,8 @@
 // *
 // * - Program is terminated with SIGINT (ctrl-C)
 // **************************************************************************************
+//rachel cavalier
+//9/28/2025
 #include "webServer.h"
 #include <signal.h>
 
@@ -43,7 +45,7 @@ void sig_handler(int signo) {
 //   - Return HTTP code to be sent back
 //   - Set filename if appropriate. Filename syntax is valided but existance is not verified.
 // **************************************************************************************
-int readHeader(int sockFd,std::string &filename) {
+int readHeader(int sockFd,std::string &filename, std::string &request) {
   int code = 400;
   std::string container;
   char buffer[10];
@@ -59,19 +61,20 @@ int readHeader(int sockFd,std::string &filename) {
   size_t lineEnd = container.find("\r\n");
   //400?
   std::string getLine = container.substr(0,lineEnd);
-  std::cout << "getline is " << getLine << std::endl;
+  DEBUG << "getline is " << getLine << ENDL;
   size_t endGet = getLine.find(' ');
   std::string get = getLine.substr(0, endGet);
   size_t endAddr = getLine.find(' ', endGet +1);
   std::string addr = getLine.substr(endGet+1, endAddr - endGet -1);
   //if valid get get filename
-  if(get != "GET"){
-    DEBUG << "NOT a valid GET" << ENDL;
+  if(get == "GET" || get == "HEAD" || get == "POST"){
+    request = get;
+  }else{
+    std::cout << "NOT a valid Request" << std::endl;
     return code;
   }
-  //post and head
   filename = "data/" + addr.substr(1);
-  std::cout << "filename is " << filename << std::endl;
+  DEBUG << "filename is " << filename << ENDL;
   //check filename validity
   //how to check a filename has number .html or number and .jpg and file/image
   std::regex filenameExpression("(image[0-4]\\.jpg|file[0-9]\\.html)");
@@ -129,12 +132,83 @@ void send400(int sockFd) {
   sendLine(sockFd, blankLine);
   return;
 }
-
-
+// **************************************************************************
+// * Send just the Header
+// **************************************************************************
+void sendHead(int sockFd, std::string filename){
+  DEBUG << "in send header" << ENDL;
+  std::string string200 = "HTTP/1.0 200 OK";
+  std::string blankLine = "";
+  std::string contentImage = "Content-Type: image/jpeg";
+  std::string contentFile = "Content-Type: text/html";
+  std::string contentLength = "Content-Length: ";
+  struct stat filenameStat;
+  if(stat(filename.c_str(), &filenameStat) == -1){
+    //read permission lacking or DNE
+    DEBUG << "Stat return -1" << ENDL;
+    send404(sockFd);
+    return;
+  }
+  int sizeFile = filenameStat.st_size;
+  sendLine(sockFd, string200);
+  if(filename.find("image") != std::string::npos){
+    sendLine(sockFd, contentImage);
+  }else if(filename.find("file") != std::string::npos){
+    sendLine(sockFd, contentFile);
+  }
+  contentLength.append(std::to_string(sizeFile));
+  sendLine(sockFd, contentLength);
+  sendLine(sockFd, blankLine);
+  return;
+}
+// **************************************************************************
+// * Save the file through overwite or creation
+// **************************************************************************
+void saveFile(int sockFd, std::string filename){
+  //OTRUNC is overwrite and OCREAT is create if DNE
+  DEBUG << "In saveFile" << ENDL;
+  struct stat filenameStat;
+  std::string created = "HTTP/1.0 201 Created";
+  std::string overwrite = "HTTP/1.0 200 OK";
+  std::string blankLine = "";
+  bool exists = false;
+  char buffer[10];
+  ssize_t bytesRead;
+  bool endBody = false;
+  if(stat(filename.c_str(), &filenameStat) == 0){
+    exists = true;
+  }
+  int post = open(filename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  if(post == -1){
+    DEBUG << "ERROR in open for POST" << ENDL; 
+    send400(sockFd);
+    return;
+  }
+  while(!endBody){
+    bytesRead = read(sockFd, buffer, 10);
+    if(bytesRead <= 0){
+      //EOF
+      endBody = true;
+      DEBUG << "END of body detected" << ENDL;
+      continue;
+    }
+    write(post, buffer, bytesRead);
+  }
+  DEBUG << "About to send overwrite or create" << ENDL;
+  if(exists){
+    sendLine(sockFd, overwrite);
+  }else if(!exists){
+    sendLine(sockFd, created);
+  }
+  sendLine(sockFd, blankLine);
+  close(post);
+  return;
+}
 // **************************************************************************************
 // * sendFile
 // * -- Send a file back to the browser.
 // **************************************************************************************
+
 void sesendFile(int sockFd,std::string filename) {
   DEBUG << "in send file" << ENDL;
   std::string string200 = "HTTP/1.0 200 OK";
@@ -143,6 +217,7 @@ void sesendFile(int sockFd,std::string filename) {
   std::string contentFile = "Content-Type: text/html";
   std::string contentLength = "Content-Length: ";
   struct stat filenameStat;
+
   if(stat(filename.c_str(), &filenameStat) == -1){
     //read permission lacking or DNE
     DEBUG << "Stat return -1" << ENDL;
@@ -184,7 +259,6 @@ void sesendFile(int sockFd,std::string filename) {
     byteSent +=  currBytes;
   }
   
-
   //when done just return
   //since you set the content length you dont send the line terminator at the end of the file
   close(fileRead);
@@ -203,29 +277,28 @@ int processConnection(int sockFd) {
   bool closeFound = false;
   bool terminatorFound = false;
   std::string filename;
+  std::string request;
   //Call readHeader()
-  int headerReturn = readHeader(sockFd, filename);
+  int headerReturn = readHeader(sockFd, filename, request);
+  // If read header returned 400, send 400
   if(headerReturn == 400){
    send400(sockFd);
    return 0;
   }else if(headerReturn == 404){
-   send404(sockFd);
+   // If read header returned 404, call send404
+    send404(sockFd);
    return 0;
-  }else if(headerReturn == 200){
-   sesendFile(sockFd, filename);
+  }else if(headerReturn == 200 && request == "GET"){
+    // 471: If read header returned 200, call sendFile
+    // - If the header was valid and the method was GET, call sendFile()
+    sesendFile(sockFd, filename);
+  }else if(headerReturn == 200 && request == "HEAD"){
+    // - If the header was valid and the method was HEAD, call a function to send back the header.
+    sendHead(sockFd, filename);
+  }else if(headerReturn == 200 && request == "POST"){
+    // - If the header was valid and the method was POST, call a function to save the file to dis.
+    saveFile(sockFd, filename);
   }
-  
-
-  // If read header returned 400, send 400
-
-  // If read header returned 404, call send404
-
-  // 471: If read header returned 200, call sendFile
-  
-  // 598 students
-  // - If the header was valid and the method was GET, call sendFile()
-  // - If the header was valid and the method was HEAD, call a function to send back the header.
-  // - If the header was valid and the method was POST, call a function to save the file to dis.
 
   return 0;
 }
@@ -302,7 +375,7 @@ int main (int argc, char *argv[]) {
   uint16_t port;
   bool exitLoop;
   exitLoop = false;
-  port = 1029;
+  port = 1701;
   DEBUG << "Calling bind()" << ENDL;
   while(exitLoop == false){
     server_addr.sin_port = htons(port);  //hon()??
