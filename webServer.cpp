@@ -59,20 +59,18 @@ int readHeader(int sockFd,std::string &filename, std::string &request, int &cont
       if(container.size() > endHeaderPos + 4){
         bodyStart = container.substr(endHeaderPos + 4);
       }
-
     }
   }
   
-  //first line look for GET (and later post)
+  //first line look for GET (and later post/head)
   size_t lineEnd = container.find("\r\n");
-  //400?
   std::string getLine = container.substr(0,lineEnd);
   DEBUG << "getline is " << getLine << ENDL;
   size_t endGet = getLine.find(' ');
   std::string get = getLine.substr(0, endGet);
   size_t endAddr = getLine.find(' ', endGet +1);
   std::string addr = getLine.substr(endGet+1, endAddr - endGet -1);
-  //if valid get get filename
+  //check if valid
   if(get == "GET" || get == "HEAD" || get == "POST"){
     request = get;
   }else{
@@ -192,9 +190,11 @@ void saveFile(int sockFd, std::string filename, int contentLength, std::string b
   ssize_t bytesRead;
   int total = 0;
   bool endBody = false;
+  //check if file exists already
   if(stat(filename.c_str(), &filenameStat) == 0){
     exists = true;
   }
+  //open file and add body contents
   int post = open(filename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
   if(post == -1){
     DEBUG << "ERROR in open for POST" << ENDL; 
@@ -433,8 +433,11 @@ int main (int argc, char *argv[]) {
   // * connections and starts the kernel listening for connections.
   // ********************************************************************
   DEBUG << "Calling listen()" << ENDL;
-  listen(listenFd, 10);
+  int listenTry = listen(listenFd, 10);
   //check failure
+  if(listenTry == -1){
+    DEBUG << "Listen Failure" << ENDL;
+  }
   
 
 
